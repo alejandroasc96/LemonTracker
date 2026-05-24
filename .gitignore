@@ -157,6 +157,8 @@ ENV/
 env.bak/
 venv.bak/
 .vscode/
+data/
+view-source_https___steamdb.info_upcoming_free_.html
 
 # Spyder project settings
 .spyderproject
