@@ -1,0 +1,35 @@
+name: Actualizar Juegos SteamDB
+
+on:
+  schedule:
+    # Se ejecuta a las 09:00 y a las 17:00 UTC todos los días
+    - cron: '0 9,17 * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: |
+          pip install beautifulsoup4 curl_cffi
+
+      - name: Ejecutar Scraper Ligero
+        run: |
+          python scraper_pi2.py
+
+      - name: Guardar cambios en la Base de Datos
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add -f data/games.db
+          git commit -m "BBDD actualizada automáticamente" || exit 0
+          git push
