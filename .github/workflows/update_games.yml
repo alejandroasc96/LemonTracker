@@ -24,7 +24,7 @@ jobs:
 
       - name: Ejecutar Scraper Ligero
         run: |
-          python src/scraper_pi2.py
+          python src/scraper3.py
 
       - name: Guardar cambios en la Base de Datos
         run: |
@@ -33,4 +33,4 @@ jobs:
           git add -f data/games.db
           git commit -m "BBDD actualizada automáticamente" || exit 0
           git push
-          
+
