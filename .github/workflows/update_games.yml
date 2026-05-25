@@ -35,6 +35,6 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add data/games.db
+          git add -f data/games.db
           git commit -m "BBDD actualizada automáticamente" || exit 0
           git push
