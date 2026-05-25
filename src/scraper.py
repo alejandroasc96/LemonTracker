@@ -7,9 +7,7 @@ from DrissionPage import ChromiumPage, ChromiumOptions
 DB_PATH = "data/games.db"
 
 def init_db():
-    # 🔥 Asegura que GitHub Actions no falle si la carpeta 'data' no se ha creado aún
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
@@ -28,59 +26,79 @@ def init_db():
     conn.close()
 
 def obtener_html_con_navegador():
-    """Descarga el HTML usando DrissionPage bajo pantalla virtual para saltarse el 403."""
-    print("Abriendo navegador optimizado (DrissionPage) para evadir Cloudflare...")
+    print("Abriendo navegador emulado (DrissionPage) para evadir Cloudflare...")
     options = ChromiumOptions()
-    options.headless(False)  # Obligatorio Falso para que Xvfb emule la pantalla humana
+    options.headless(False)  # Obligatorio Falso para entornos Xvfb
     
-    # Optimizaciones de bajo consumo de recursos para GitHub Actions
+    # Parámetros de camuflaje y ahorro de RAM
     options.set_argument('--disable-gpu')
     options.set_argument('--no-sandbox')
     options.set_argument('--disable-dev-shm-usage')
-    options.set_argument('--blink-settings=imagesEnabled=false')  # No carga imágenes para ahorrar RAM
+    options.set_argument('--blink-settings=imagesEnabled=false')
+    options.set_argument('--window-size=1024,768')
     options.set_argument('--mute-audio')
-    options.set_argument('--disable-extensions')
     
     try:
         page = ChromiumPage(options)
         url = "https://steamdb.info/upcoming/free/"
         page.get(url)
         
-        print(f"Página cargada: '{page.title}'. Esperando renderizado antibot...")
-        time.sleep(8)  # Tiempo prudencial para superar el reto visual de Cloudflare
+        # 🔄 BUCLE INTELIGENTE: Espera a que Cloudflare nos dé paso libre
+        limite_espera = 25
+        tiempo_inicial = time.time()
         
+        print("Interceptando estado de la página...")
+        while time.time() - tiempo_inicial < limite_espera:
+            titulo_actual = page.title
+            if "Just a moment" not in titulo_actual and "Cloudflare" not in titulo_actual:
+                print(f"¡Desafío superado! Página real detectada: '{titulo_actual}'")
+                break
+            print("Atrapado en sala de espera de Cloudflare... Reintentando en 3 segundos...")
+            time.sleep(3)
+            
         html_bruto = page.html
         page.quit()
         return html_bruto
     except Exception as e:
-        print(f"Error crítico al conectar con la web mediante navegador emulado: {e}")
+        print(f"Error crítico en el navegador virtual: {e}")
         return None
 
 def procesar_html_con_soup(html_content):
     if not html_content:
-        print("El HTML está vacío o no se pudo descargar. Cancelando procesamiento.")
+        print("El HTML está vacío. Cancelando procesamiento.")
         return
 
     print("Analizando el código fuente con BeautifulSoup...")
     soup = BeautifulSoup(html_content, 'html.parser')
     
+    # Extracción de tus selectores originales
+    panels = soup.select('div.panel-sale.app-history-row')
+    upcoming_links = soup.select('ul.upcoming-list li a')
+    
+    print(f"Soup ha detectado {len(panels)} paneles actuales en el HTML.")
+    print(f"Soup ha detectado {len(upcoming_links)} futuros juegos en el HTML.")
+
+    # 🚨 EL CINTURÓN DE SEGURIDAD: Si ambos están vacíos, es un bloqueo. ¡No borramos nada!
+    if len(panels) == 0 and len(upcoming_links) == 0:
+        print("⚠️ ALERTA: No se han podido extraer datos (Posible bloqueo estricto de Cloudflare).")
+        print("Para proteger tu historial, NO se modificará la base de datos en esta ejecución.")
+        return
+
+    # Si el HTML es válido y contiene información, procedemos a actualizar
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM current_games")
     cursor.execute("DELETE FROM upcoming_games")
 
     # =========================================================
-    # TU SECCIÓN 1: JUEGOS ACTUALES (Mantenida intacta)
+    # TU SECCIÓN 1: JUEGOS ACTUALES
     # =========================================================
-    panels = soup.select('div.panel-sale.app-history-row')
-    print(f"Soup ha detectado {len(panels)} paneles actuales en el HTML.")
-
     for panel in panels:
         game_id = panel.get('data-appid') or '0'
         sub_id = panel.get('data-subid') or '0'
         
         if game_id == "730" and sub_id == "14":
-            continue  # Filtro de la plantilla interna de SteamDB
+            continue  
             
         title_elem = panel.select_one('.panel-sale-name a')
         if not title_elem:
@@ -118,11 +136,8 @@ def procesar_html_con_soup(html_content):
         ''', (db_id, title, game_url, image_url, promo_type, end_date))
 
     # =========================================================
-    # TU SECCIÓN 2: FUTUROS JUEGOS (Mantenida intacta)
+    # TU SECCIÓN 2: FUTUROS JUEGOS
     # =========================================================
-    upcoming_links = soup.select('ul.upcoming-list li a')
-    print(f"Soup ha detectado {len(upcoming_links)} futuros juegos en el HTML.")
-
     for item in upcoming_links:
         full_text = item.text.strip()
         href = item.get('href') or ''
@@ -152,10 +167,9 @@ def procesar_html_con_soup(html_content):
 
     conn.commit()
     conn.close()
-    print("¡Base de datos actualizada con éxito mediante BeautifulSoup y DrissionPage!")
+    print("¡Base de datos actualizada con éxito mediante tus selectores personalizados!")
 
 if __name__ == "__main__":
     init_db()
-    # Cambiamos la descarga ligera por la descarga emulada que supera Cloudflare
     html_obtenido = obtener_html_con_navegador()
     procesar_html_con_soup(html_obtenido)
