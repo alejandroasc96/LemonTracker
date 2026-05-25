@@ -24,7 +24,7 @@ jobs:
 
       - name: Ejecutar Scraper Ligero
         run: |
-          python scraper_pi2.py
+          python src/scraper_pi2.py
 
       - name: Guardar cambios en la Base de Datos
         run: |
