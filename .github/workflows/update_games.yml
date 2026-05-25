@@ -20,15 +20,21 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install cloudscraper beautifulsoup4
+          pip install DrissionPage beautifulsoup4
 
-      - name: Ejecutar Scraper
-        run: python src/scraper.py
+      - name: Instalar Servidor de Pantalla Virtual (Xvfb)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb x11-utils
+
+      - name: Ejecutar Scraper con Monitor Virtual
+        run: |
+          xvfb-run --server-args="-screen 0 1024x768x24" python src/scraper.py
 
       - name: Guardar cambios en la Base de Datos
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add data/games.db
+          git add -f data/games.db
           git commit -m "BBDD actualizada automáticamente" || exit 0
           git push
