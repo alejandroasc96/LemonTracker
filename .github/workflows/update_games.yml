@@ -20,7 +20,7 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install DrissionPage beautifulsoup4
+          pip install DrissionPage beautifulsoup4 curl_cffi
 
       - name: Instalar Servidor de Pantalla Virtual (Xvfb)
         run: |
