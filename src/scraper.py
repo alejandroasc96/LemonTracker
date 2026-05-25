@@ -7,7 +7,6 @@ from DrissionPage import ChromiumPage, ChromiumOptions
 DB_PATH = "data/games.db"
 
 def init_db():
-    # 🔥 Asegura que GitHub Actions no falle si la carpeta 'data' no se ha creado aún
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     
     conn = sqlite3.connect(DB_PATH)
