@@ -5,8 +5,8 @@ from scrapers.base import BaseScraper
 class EpicScraper(BaseScraper):
     def __init__(self):
         super().__init__(name="EpicScraper")
-        # API interna de ofertas y juegos gratuitos de Epic
-        self.url = "https://store-site-backend-eats.ak.epicgames.com/freeGamesPromotions?locale=es-ES&country=ES&allowCountries=ES"
+        # Endpoint estático oficial e inmune a problemas de DNS locales
+        self.url = "https://store-site-backend-static-ipv4.ak.epicgames.com/freeGamesPromotions?locale=es-ES&country=ES&allowCountries=ES"
 
     def extraer(self) -> List[Dict[str, Any]]:
         raw_response = self.fetch_html(self.url)
@@ -20,50 +20,52 @@ class EpicScraper(BaseScraper):
             
             for item in elements:
                 title = item.get("title")
-                # Si el precio original es 0 de forma permanente, suele ser un F2P genérico, 
-                # nosotros buscamos promociones temporales del 100% de descuento.
                 price_info = item.get("price", {}).get("totalPrice", {})
                 promotions = item.get("promotions")
                 
                 if not promotions:
                     continue
 
-                # Identificar si la promoción está activa hoy o es futura
                 promo_activa = promotions.get("promotionalOffers", [])
                 promo_futura = promotions.get("upcomingPromotionalOffers", [])
-                
+
                 status = None
                 end_date = None
                 estimated_date = None
-                
-                if promo_activa:
+
+                # 1. VALIDAR PROMOCIONES ACTIVAS (Juegos gratis HOY)
+                if promo_activa and len(promo_activa) > 0:
                     offers = promo_activa[0].get("promotionalOffers", [])
                     for offer in offers:
-                        if offer.get("discountSetting", {}).get("discountPercentage") == 0:
+                        discount_pct = offer.get("discountSetting", {}).get("discountPercent")
+                        # CORRECCIÓN CRÍTICA: Es gratis si el descuento es 100%, 0% (tarifa plana), o si el precio final es 0€
+                        if discount_pct in [0, 100] or price_info.get("discountPrice") == 0:
                             status = "current"
                             end_date = offer.get("endDate")
                             break
-                            
-                if not status and promo_futura:
-                    offers = promo_futura[0].get("promotionalOffers", [])
+
+                # 2. VALIDAR PROMOCIONES FUTURAS (Próximo jueves / Cajas Misteriosas)
+                if not status and promo_futura and len(promo_futura) > 0:
+                    offers = promo_futura[0].get("upcomingPromotionalOffers", []) or promo_futura[0].get("promotionalOffers", [])
                     for offer in offers:
-                        if offer.get("discountSetting", {}).get("discountPercentage") == 0:
+                        discount_pct = offer.get("discountSetting", {}).get("discountPercent")
+                        if discount_pct in [0, 100]:
                             status = "upcoming"
                             estimated_date = offer.get("startDate")
                             break
 
-                # Si no encontramos ninguna promoción válida de coste 0%, ignoramos el juego
+                # Si no es una promoción gratuita válida, la ignoramos completamente
                 if not status:
                     continue
 
-                # Construcción de la URL de la tienda
+                # Construir la URL de la tienda
                 slug = item.get("productSlug") or item.get("urlSlug")
                 game_url = f"https://store.epicgames.com/es-ES/p/{slug}" if slug else "https://store.epicgames.com/"
 
-                # Extraer miniatura (buscamos la imagen tipo Thumbnail o DieselStoreFrontWide)
+                # Extraer la mejor imagen disponible (añadimos VaultClosed para las cajas misteriosas)
                 image_url = None
                 for img in item.get("keyImages", []):
-                    if img.get("type") in ["Thumbnail", "DieselStoreFrontWide"]:
+                    if img.get("type") in ["Thumbnail", "DieselStoreFrontWide", "VaultClosed"]:
                         image_url = img.get("url")
                         break
 
@@ -73,7 +75,7 @@ class EpicScraper(BaseScraper):
                     "title": title,
                     "url": game_url,
                     "image_url": image_url,
-                    "promo_type": "Keep",  # Epic siempre regala en modalidad "Para siempre"
+                    "promo_type": "Keep",  # Las promociones semanales de Epic siempre son para conservar
                     "status": status,
                     "end_date": end_date,
                     "estimated_date": estimated_date
