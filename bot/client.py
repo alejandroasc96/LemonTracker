@@ -32,17 +32,15 @@ class GameNotifierBot(commands.Bot):
         except Exception as e:
             print(f"❌ Error sincronizando comandos: {e}")
 
-        # Establecer presencia/estado estático ligero
         await self.change_presence(
             activity=discord.Activity(type=discord.ActivityType.watching, name="ofertas de juegos")
         )
 
-    @tasks.loop(seconds=SCRAPE_INTERVAL_SECONDS)
+    @tasks.loop(hours=12)
     async def scrape_loop(self):
-        """Bucle en segundo plano que se ejecuta de forma controlada y asíncrona."""
-        # Esperar a que el bot esté completamente listo internamente antes de raspar
+        """Bucle en segundo plano que se ejecuta de forma controlada cada 12 horas."""
         await self.wait_until_ready()
         try:
             await self.notifier_service.run_scrapers_and_notify()
         except Exception as e:
-            print(f"❌ Error en la ejecución del bucle del scraper: {e}")
+            print(f"❌ Error crítico en el bucle principal: {e}")

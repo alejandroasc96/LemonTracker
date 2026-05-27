@@ -75,7 +75,7 @@ class EpicScraper(BaseScraper):
                     "title": title,
                     "url": game_url,
                     "image_url": image_url,
-                    "promo_type": "Keep",  # Las promociones semanales de Epic siempre son para conservar
+                    "promo_type": "Keep",
                     "status": status,
                     "end_date": end_date,
                     "estimated_date": estimated_date

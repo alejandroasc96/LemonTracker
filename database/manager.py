@@ -1,6 +1,6 @@
 from typing import List, Dict, Set, Any, Optional
 from database.connection import get_db_connection
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def get_cached_game_ids() -> Set[str]:
     """Carga rápidamente todos los IDs existentes en RAM para el Diff-Caching."""
@@ -13,46 +13,62 @@ def get_cached_game_ids() -> Set[str]:
 
 def save_games_batch(games_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Guarda juegos en lote utilizando transacciones atómicas.
-    Retorna únicamente los juegos que son NUEVOS para proceder a notificar.
+    Guarda juegos en lote y aplica la Regla de Exclusión de 14 días.
+    Retorna únicamente los juegos gratuitos actuales ('current') válidos para notificar.
     """
     if not games_list:
         return []
 
-    cached_ids = get_cached_game_ids()
-    new_games_detected = []
+    new_games_to_notify = []
+    now = datetime.utcnow()
     
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
-        # Iniciamos una transacción explícita
         cursor.execute("BEGIN TRANSACTION;")
         
         for game in games_list:
-            # Si el juego ya existe, hacemos un update silencioso por si cambió la fecha de fin,
-            # pero no lo clasificamos como 'nuevo juego a notificar' a menos que cambie su estado.
-            if game["id"] not in cached_ids:
-                new_games_detected.append(game)
-                
-            cursor.execute('''
-                INSERT INTO games (id, platform, title, url, image_url, promo_type, status, end_date, estimated_date)
-                VALUES (:id, :platform, :title, :url, :image_url, :promo_type, :status, :end_date, :estimated_date)
-                ON CONFLICT(id) DO UPDATE SET
-                    status=excluded.status,
-                    end_date=excluded.end_date,
-                    estimated_date=excluded.estimated_date
-            ''', game)
+            # Solo evaluamos juegos actualmente gratuitos, ignoramos los 'upcoming' para las alertas globales
+            if game.get("status") != "current":
+                continue
+
+            cursor.execute("SELECT last_notified FROM games WHERE id = ?", (game["id"],))
+            row = cursor.fetchone()
+
+            # Lógica de decisión de notificación
+            debe_notificar = False
             
+            if row is None:
+                # El juego es completamente nuevo en el sistema
+                debe_notificar = True
+            elif row["last_notified"]:
+                # El juego existe. Comprobamos si han pasado más de 14 días desde la última notificación
+                last_notified_date = datetime.fromisoformat(row["last_notified"])
+                if (now - last_notified_date) > timedelta(days=14):
+                    debe_notificar = True
+
+            if debe_notificar:
+                new_games_to_notify.append(game)
+                # Guardamos o actualizamos (Upsert) el registro y actualizamos su marca de tiempo
+                cursor.execute("""
+                    INSERT INTO games (id, platform, title, url, image_url, promo_type, status, end_date, estimated_date, last_notified)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET 
+                        status=excluded.status, 
+                        end_date=excluded.end_date,
+                        last_notified=excluded.last_notified
+                """, (game["id"], game["platform"], game["title"], game["url"], game.get("image_url"), 
+                      game["promo_type"], game["status"], game.get("end_date"), game.get("estimated_date"), now.isoformat()))
+        
         conn.commit()
     except Exception as e:
         conn.rollback()
-        print(f"❌ Error en la transacción de guardado: {e}")
-        new_games_detected = []
+        print(f"❌ Error en base de datos al guardar lote: {e}")
     finally:
         conn.close()
-        
-    return new_games_detected
+
+    return new_games_to_notify
 
 def update_notification_time(game_id: str):
     """Registra la marca de tiempo actual al enviar la notificación."""

@@ -132,6 +132,57 @@ class GameCommands(commands.Cog):
                 ephemeral=True
             )
 
+    @app_commands.command(name="forzar_scrapers", description="🤖 [Admin] Fuerza la ejecución manual de todos los scrapers.")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def forzar_scrapers(self, interaction: discord.Interaction):
+        """Llama directamente al servicio orquestador del bot."""
+        # Avisamos de inmediato de forma efímera para evitar el timeout de 3 segundos de Discord
+        await interaction.response.send_message("⚡ Iniciando ciclo forzado de raspado... Revisa la consola de la Nano Pi.", ephemeral=True)
+        
+        try:
+            # Accedemos al notifier_service desde la instancia del cliente/bot
+            await interaction.client.notifier_service.run_scrapers_and_notify()
+            await interaction.followup.send("✅ Ciclo de raspado y notificación completado.", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Error al forzar scrapers: {e}", ephemeral=True)
+
+    @app_commands.command(name="test_tarjeta", description="🎨 [Admin] Envía una tarjeta de prueba con el nuevo diseño visual.")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def test_tarjeta(self, interaction: discord.Interaction):
+        """Genera un juego ficticio para comprobar que los botones y el Embed se ven perfectos."""
+        await interaction.response.defer(ephemeral=True)
+        
+        # Creamos un diccionario falso (Mock) imitando la estructura de tus scrapers
+        juego_falso = {
+            "id": "steam_test_999999",
+            "platform": "steam",
+            "title": "Cyberpunk 2077 (Juego de Prueba)",
+            "url": "https://store.steampowered.com/app/1091500/Cyberpunk_2077/",
+            "image_url": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1091500/capsule_616x353.jpg",
+            "promo_type": "Keep",
+            "status": "current",
+            "end_date": "2026-12-31T23:59:59Z"
+        }
+        
+        try:
+            # Construimos la tarjeta usando los métodos de tu nuevo notifier.py
+            notifier = interaction.client.notifier_service
+            embed = notifier._build_game_embed(juego_falso)
+            
+            # Importamos la vista de los botones localmente para el test
+            from services.notifier import ClaimGameView
+            view = ClaimGameView(juego_falso["url"], juego_falso["platform"])
+            
+            # Lo enviamos directamente al canal donde se ejecutó el comando para verlo en directo
+            await interaction.channel.send(
+                content="🧪 **[TEST DE INTERFAZ]** Así es como verán los usuarios las alertas:", 
+                embed=embed, 
+                view=view
+            )
+            await interaction.followup.send("✅ Tarjeta de prueba enviada con éxito.", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Error al generar la tarjeta: {e}", ephemeral=True)
+
 
 # Función obligatoria para que discord.py cargue el Cog correctamente
 async def setup(bot: commands.Bot):
