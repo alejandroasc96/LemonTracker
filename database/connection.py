@@ -69,4 +69,13 @@ def init_db():
     ''')
     
     conn.commit()
+
+    # --- MIGRACIÓN DEFENSIVA PARA EL BOLETÍN BISEMANAL ---
+    try:
+        cursor.execute("ALTER TABLE guild_settings ADD COLUMN last_upcoming_report TEXT;")
+        conn.commit()
+    except sqlite3.OperationalError:
+        # Si la columna ya existe en la MicroSD, SQLite dará error. Lo ignoramos de forma segura.
+        pass
+
     conn.close()

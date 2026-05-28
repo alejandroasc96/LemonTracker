@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands, tasks
 from config import SCRAPE_INTERVAL_SECONDS
 from services.notifier import NotifierService
+from datetime import time, timezone
 
 class GameNotifierBot(commands.Bot):
     def __init__(self):
@@ -20,6 +21,7 @@ class GameNotifierBot(commands.Bot):
         
         # Iniciar el bucle asíncrono periódico de raspado de datos
         self.scrape_loop.start()
+        self.biweekly_loop.start()
 
     async def on_ready(self):
         print(f"🤖 [Bot] Conectado con éxito como {self.user}")
@@ -44,3 +46,12 @@ class GameNotifierBot(commands.Bot):
             await self.notifier_service.run_scrapers_and_notify()
         except Exception as e:
             print(f"❌ Error crítico en el bucle principal: {e}")
+
+    @tasks.loop(time=time(hour=12, minute=0, tzinfo=timezone.utc))
+    async def biweekly_loop(self):
+        """Bucle diario ultra optimizado que despierta al bot a las 12:00 UTC para comprobar el boletín."""
+        await self.wait_until_ready()
+        try:
+            await self.notifier_service.check_and_send_biweekly_digest()
+        except Exception as e:
+            print(f"❌ Error crítico en el bucle del boletín dominical: {e}")

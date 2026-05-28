@@ -152,3 +152,87 @@ class NotifierService:
         )
 
         return embed
+    
+    def _build_upcoming_digest_embed(self, upcoming_games: List[Dict[str, Any]]) -> discord.Embed:
+        """Construye una tarjeta informativa limpia y exclusiva para los próximos juegos estimados de Steam."""
+        embed = discord.Embed(
+            title="⏳ Próximas Previsiones de Juegos Gratuitos",
+            description=(
+                "Estos son los títulos detectados en la base de datos de SteamDB que planean futuras promociones.\n"
+                "⚠️ *Las fechas son estimadas por la comunidad y pueden variar.*\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            ),
+            color=0x1b2838  # Azul oscuro mate de Steam
+        )
+        
+        # Filtrar solo juegos de Steam y limitar a un Top 8 para mantenerlo compacto
+        steam_upcoming = [g for g in upcoming_games if g["platform"] == "steam"][:8]
+        
+        if not steam_upcoming:
+            embed.description += "\n📭 No hay previsiones de Steam detectadas en este ciclo.\n"
+        else:
+            # Construimos la lista usando encabezados grandes (###) en una sola línea
+            for game in steam_upcoming:
+                fecha_est = game.get("estimated_date") or "Por confirmar"
+                embed.description += f"### 🎮 {game['title']} - {fecha_est}\n"
+                
+        embed.description += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                
+        # Bloque limpio de llamada a la acción en la parte inferior
+        embed.add_field(
+            name="🔔 ¿Quieres que el bot te avise automáticamente?",
+            value="Si quieres que te envíe un **Mensaje Directo (DM)** en cuanto cualquiera de estos títulos pase a estar disponible, simplemente usa el comando **`/proximos`** y selecciónalo en el menú desplegable.",
+            inline=False
+        )
+        
+        embed.set_thumbnail(url="https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/512px-Steam_icon_logo.svg.png")
+        embed.set_footer(text="Boletín Bisemanal de Previsiones • Game Notifier Bot")
+        return embed
+
+    async def check_and_send_biweekly_digest(self):
+        """Comprueba si hoy es domingo y distribuye el boletín si pasaron 14 días desde el último envío."""
+        now = datetime.utcnow()
+        
+        # En Python, el domingo es el día 6 de la semana (0=Lunes, ..., 6=Domingo)
+        if now.weekday() != 6:
+            return
+
+        upcoming_games = db_manager.get_upcoming_games()
+        if not upcoming_games:
+            return
+
+        embed = self._build_upcoming_digest_embed(upcoming_games)
+        
+        conn = db_manager.get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT guild_id, alert_channel_id, last_upcoming_report FROM guild_settings")
+        guilds_data = cursor.fetchall()
+        conn.close()
+
+        for row in guilds_data:
+            guild_id = row["guild_id"]
+            channel_id = row["alert_channel_id"]
+            last_report_str = row["last_upcoming_report"]
+
+            debe_enviar = False
+            if not last_report_str:
+                debe_enviar = True
+            else:
+                last_report = datetime.fromisoformat(last_report_str)
+                # Margen de seguridad de 13 días para evitar problemas si el reloj varía por unos minutos
+                if (now - last_report).days >= 13:
+                    debe_enviar = True
+
+            if debe_enviar:
+                guild = self.bot.get_guild(int(guild_id))
+                if not guild:
+                    continue
+                
+                channel = guild.get_channel(int(channel_id)) if channel_id else guild.system_channel
+                if channel:
+                    try:
+                        await channel.send(embed=embed)
+                        db_manager.update_guild_upcoming_report_time(guild_id, now.isoformat())
+                        print(f"📅 [Boletín] Boletín bisemanal enviado al servidor: {guild.name}")
+                    except Exception as e:
+                        print(f"❌ Error al enviar boletín dominical a {guild.name}: {e}")

@@ -112,33 +112,65 @@ class GameCommands(commands.Cog):
         view = SubscriptionView(upcoming_games)
         await interaction.followup.send(embed=embed, view=view)
 
+    # @app_commands.command(name="configurar_canal", description="Cambia el canal donde el bot publicará las alertas automáticas de juegos.")
+    # @app_commands.describe(canal="Selecciona el canal de texto para los anuncios.")
+    # @app_commands.default_permissions(administrator=True)
+    # @app_commands.checks.has_permissions(administrator=True) # Exclusivo para Administradores
+    # async def configurar_canal(self, interaction: discord.Interaction, canal: discord.TextChannel):
+    #     """Comando Administrativo para enrutar las alertas globales y publicar el estado actual."""
+    #     await interaction.response.defer(ephemeral=True)
+        
+    #     db_manager.save_guild_channel(str(interaction.guild_id), str(canal.id))
+        
+    #     await interaction.followup.send(
+    #         f"⚙️ **Configuración Guardada:** A partir de ahora, las alertas globales se enviarán a {canal.mention}. Generando listado de bienvenida...",
+    #         ephemeral=True
+    #     )
+
+    #     # Buscar juegos activos en la DB y mandarlos al nuevo canal
+    #     active_games = db_manager.get_active_games()
+    #     if active_games:
+    #         notifier = interaction.client.notifier_service
+    #         embeds = [notifier._build_game_embed(game) for game in active_games]
+            
+    #         # Agrupamos en bloques de 10 (Límite estricto de Discord para embeds en un solo mensaje)
+    #         for i in range(0, len(embeds), 10):
+    #             await canal.send(
+    #                 content="🎉 **[Juegos Gratuitos Actuales]** Aquí tienes los títulos disponibles:" if i == 0 else "",
+    #                 embeds=embeds[i:i+10]
+    #             )
     @app_commands.command(name="configurar_canal", description="Cambia el canal donde el bot publicará las alertas automáticas de juegos.")
     @app_commands.describe(canal="Selecciona el canal de texto para los anuncios.")
     @app_commands.default_permissions(administrator=True)
-    @app_commands.checks.has_permissions(administrator=True) # Exclusivo para Administradores
+    @app_commands.checks.has_permissions(administrator=True)
     async def configurar_canal(self, interaction: discord.Interaction, canal: discord.TextChannel):
-        """Comando Administrativo para enrutar las alertas globales y publicar el estado actual."""
+        """Comando Administrativo para enrutar las alertas globales."""
         await interaction.response.defer(ephemeral=True)
         
         db_manager.save_guild_channel(str(interaction.guild_id), str(canal.id))
         
         await interaction.followup.send(
-            f"⚙️ **Configuración Guardada:** A partir de ahora, las alertas globales se enviarán a {canal.mention}. Generando listado de bienvenida...",
+            f"⚙️ **Configuración Guardada:** A partir de ahora, las alertas globales se enviarán a {canal.mention}. Generando listados de bienvenida...",
             ephemeral=True
         )
 
-        # Buscar juegos activos en la DB y mandarlos al nuevo canal
+        notifier = interaction.client.notifier_service
+
+        # 1. Enviar Juegos Activos Actuales
         active_games = db_manager.get_active_games()
         if active_games:
-            notifier = interaction.client.notifier_service
             embeds = [notifier._build_game_embed(game) for game in active_games]
-            
-            # Agrupamos en bloques de 10 (Límite estricto de Discord para embeds en un solo mensaje)
             for i in range(0, len(embeds), 10):
                 await canal.send(
-                    content="🎉 **[Juegos Gratuitos Actuales]** Aquí tienes los títulos disponibles:" if i == 0 else "",
+                    content="🎉 **[Juegos Gratuitos Actuales]** Aquí tienes los títulos disponibles hoy:",
                     embeds=embeds[i:i+10]
                 )
+
+        # 2. Enviar Nuevo Formato de Previsiones Futuras (Onboarding inicial)
+        upcoming_games = db_manager.get_upcoming_games()
+        if upcoming_games:
+            embed_upcoming = notifier._build_upcoming_digest_embed(upcoming_games)
+            await canal.send(embed=embed_upcoming)
 
     @configurar_canal.error
     async def configurar_canal_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
@@ -283,6 +315,57 @@ class GameCommands(commands.Cog):
             )
         except Exception as e:
             await interaction.followup.send(f"❌ Error crítico al intentar enviar el MD: {e}", ephemeral=True)
+
+    @app_commands.command(name="probar_boletin", description="🤖 [Admin] Muestra una vista previa en directo del nuevo boletín bisemanal de Steam.")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
+    async def probar_boletin(self, interaction: discord.Interaction):
+        """Genera y envía el Embed del boletín bisemanal en el canal actual para control de calidad."""
+        await interaction.response.defer(ephemeral=True)
+        
+        # 1. Intentar recuperar juegos próximos reales de la DB
+        upcoming_games = db_manager.get_upcoming_games()
+        
+        # 2. Si la DB está vacía (por ejemplo, tras un reset), creamos datos de prueba
+        # para poder evaluar el diseño visual de todos modos.
+        if not upcoming_games:
+            upcoming_games = [
+                {
+                    "id": "steam_app_test1",
+                    "platform": "steam",
+                    "title": "Half-Life 3 (Simulación de Prueba)",
+                    "url": "https://store.steampowered.com/",
+                    "estimated_date": "Noviembre de 2026",
+                    "promo_type": "Keep",
+                    "status": "upcoming"
+                },
+                {
+                    "id": "steam_app_test2",
+                    "platform": "steam",
+                    "title": "Portal 3 (Simulación de Prueba)",
+                    "url": "https://store.steampowered.com/",
+                    "estimated_date": "Por confirmar",
+                    "promo_type": "Keep",
+                    "status": "upcoming"
+                }
+            ]
+            aviso_datos = "⚠️ *Nota: Como tu base de datos no tiene juegos próximos indexados en este momento, se están mostrando títulos de prueba.*"
+        else:
+            aviso_datos = "📊 *Mostrando datos reales extraídos de tu base de datos local.*"
+
+        # 3. Construir la tarjeta usando el servicio notifier
+        notifier = interaction.client.notifier_service
+        embed_boletin = notifier._build_upcoming_digest_embed(upcoming_games)
+        
+        try:
+            # Enviamos el diseño al canal de texto para verlo al 100% de tamaño
+            await interaction.channel.send(
+                content=f"🧪 **[TEST DE INTERFAZ]** Vista previa del boletín dominical.\n{aviso_datos}",
+                embed=embed_boletin
+            )
+            await interaction.followup.send("✅ Vista previa generada en el canal.", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Error al enviar la vista previa: {e}", ephemeral=True)
 
 
 # Función obligatoria para que discord.py cargue el Cog correctamente

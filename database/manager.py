@@ -166,3 +166,11 @@ def save_guild_channel(guild_id: str, channel_id: str):
     ''', (guild_id, channel_id))
     conn.commit()
     conn.close()
+
+def update_guild_upcoming_report_time(guild_id: str, timestamp: str):
+    """Registra la fecha y hora del último boletín de próximos juegos enviado al servidor."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE guild_settings SET last_upcoming_report = ? WHERE guild_id = ?", (timestamp, guild_id))
+    conn.commit()
+    conn.close()
