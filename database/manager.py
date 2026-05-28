@@ -13,8 +13,8 @@ def get_cached_game_ids() -> Set[str]:
 
 def save_games_batch(games_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Guarda juegos en lote y aplica la Regla de Exclusión de 14 días.
-    Retorna únicamente los juegos gratuitos actuales ('current') válidos para notificar.
+    Guarda TODOS los juegos en lote, pero aplica la Regla de Exclusión de 14 días
+    únicamente a los juegos gratuitos actuales ('current').
     """
     if not games_list:
         return []
@@ -29,37 +29,37 @@ def save_games_batch(games_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         cursor.execute("BEGIN TRANSACTION;")
         
         for game in games_list:
-            # Solo evaluamos juegos actualmente gratuitos, ignoramos los 'upcoming' para las alertas globales
-            if game.get("status") != "current":
-                continue
-
             cursor.execute("SELECT last_notified FROM games WHERE id = ?", (game["id"],))
             row = cursor.fetchone()
 
-            # Lógica de decisión de notificación
             debe_notificar = False
+            last_notified_val = row["last_notified"] if row else None
             
-            if row is None:
-                # El juego es completamente nuevo en el sistema
-                debe_notificar = True
-            elif row["last_notified"]:
-                # El juego existe. Comprobamos si han pasado más de 14 días desde la última notificación
-                last_notified_date = datetime.fromisoformat(row["last_notified"])
-                if (now - last_notified_date) > timedelta(days=14):
+            # 1. Lógica de decisión de notificación SOLO para juegos activos
+            if game.get("status") == "current":
+                if row is None:
                     debe_notificar = True
+                elif row["last_notified"]:
+                    last_notified_date = datetime.fromisoformat(row["last_notified"])
+                    if (now - last_notified_date) > timedelta(days=14):
+                        debe_notificar = True
 
+            # Si pasa el filtro, lo añadimos a la lista de envíos y actualizamos su timestamp
             if debe_notificar:
                 new_games_to_notify.append(game)
-                # Guardamos o actualizamos (Upsert) el registro y actualizamos su marca de tiempo
-                cursor.execute("""
-                    INSERT INTO games (id, platform, title, url, image_url, promo_type, status, end_date, estimated_date, last_notified)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(id) DO UPDATE SET 
-                        status=excluded.status, 
-                        end_date=excluded.end_date,
-                        last_notified=excluded.last_notified
-                """, (game["id"], game["platform"], game["title"], game["url"], game.get("image_url"), 
-                      game["promo_type"], game["status"], game.get("end_date"), game.get("estimated_date"), now.isoformat()))
+                last_notified_val = now.isoformat()
+
+            # 2. Guardamos SIEMPRE el juego (sea current o upcoming)
+            cursor.execute("""
+                INSERT INTO games (id, platform, title, url, image_url, promo_type, status, end_date, estimated_date, last_notified)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET 
+                    status=excluded.status, 
+                    end_date=excluded.end_date,
+                    estimated_date=excluded.estimated_date,
+                    last_notified=excluded.last_notified
+            """, (game["id"], game["platform"], game["title"], game["url"], game.get("image_url"), 
+                  game["promo_type"], game["status"], game.get("end_date"), game.get("estimated_date"), last_notified_val))
         
         conn.commit()
     except Exception as e:

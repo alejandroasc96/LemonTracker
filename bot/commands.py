@@ -114,14 +114,31 @@ class GameCommands(commands.Cog):
 
     @app_commands.command(name="configurar_canal", description="Cambia el canal donde el bot publicará las alertas automáticas de juegos.")
     @app_commands.describe(canal="Selecciona el canal de texto para los anuncios.")
+    @app_commands.default_permissions(administrator=True)
     @app_commands.checks.has_permissions(administrator=True) # Exclusivo para Administradores
     async def configurar_canal(self, interaction: discord.Interaction, canal: discord.TextChannel):
-        """Comando Administrativo para enrutar las alertas globales."""
+        """Comando Administrativo para enrutar las alertas globales y publicar el estado actual."""
+        await interaction.response.defer(ephemeral=True)
+        
         db_manager.save_guild_channel(str(interaction.guild_id), str(canal.id))
-        await interaction.response.send_message(
-            f"⚙️ **Configuración Guardada:** A partir de ahora, las alertas globales de juegos gratuitos se enviarán a {canal.mention}.",
+        
+        await interaction.followup.send(
+            f"⚙️ **Configuración Guardada:** A partir de ahora, las alertas globales se enviarán a {canal.mention}. Generando listado de bienvenida...",
             ephemeral=True
         )
+
+        # Buscar juegos activos en la DB y mandarlos al nuevo canal
+        active_games = db_manager.get_active_games()
+        if active_games:
+            notifier = interaction.client.notifier_service
+            embeds = [notifier._build_game_embed(game) for game in active_games]
+            
+            # Agrupamos en bloques de 10 (Límite estricto de Discord para embeds en un solo mensaje)
+            for i in range(0, len(embeds), 10):
+                await canal.send(
+                    content="🎉 **[Juegos Gratuitos Actuales]** Aquí tienes los títulos disponibles:" if i == 0 else "",
+                    embeds=embeds[i:i+10]
+                )
 
     @configurar_canal.error
     async def configurar_canal_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
@@ -133,6 +150,7 @@ class GameCommands(commands.Cog):
             )
 
     @app_commands.command(name="forzar_scrapers", description="🤖 [Admin] Fuerza la ejecución manual de todos los scrapers.")
+    @app_commands.default_permissions(administrator=True)
     @app_commands.checks.has_permissions(administrator=True)
     async def forzar_scrapers(self, interaction: discord.Interaction):
         """Llama directamente al servicio orquestador del bot."""
@@ -147,6 +165,7 @@ class GameCommands(commands.Cog):
             await interaction.followup.send(f"❌ Error al forzar scrapers: {e}", ephemeral=True)
 
     @app_commands.command(name="test_tarjeta", description="🎨 [Admin] Envía una tarjeta de prueba con el nuevo diseño visual.")
+    @app_commands.default_permissions(administrator=True)
     @app_commands.checks.has_permissions(administrator=True)
     async def test_tarjeta(self, interaction: discord.Interaction):
         """Genera un juego ficticio para comprobar que los botones y el Embed se ven perfectos."""
@@ -182,6 +201,88 @@ class GameCommands(commands.Cog):
             await interaction.followup.send("✅ Tarjeta de prueba enviada con éxito.", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"❌ Error al generar la tarjeta: {e}", ephemeral=True)
+
+    @app_commands.command(name="forzar_envio", description="🤖 [Admin] Fuerza el envío de todos los juegos activos al canal configurado.")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
+    async def forzar_envio(self, interaction: discord.Interaction):
+        """Comando de depuración para probar el diseño de los mensajes sin esperar alertas globales."""
+        await interaction.response.defer(ephemeral=True)
+        
+        active_games = db_manager.get_active_games()
+        if not active_games:
+            await interaction.followup.send("❌ No hay juegos activos en la base de datos para enviar.", ephemeral=True)
+            return
+            
+        # Determinar el canal al que debe ir
+        channel_id = db_manager.get_guild_alert_channel(str(interaction.guild_id))
+        canal = interaction.guild.get_channel(int(channel_id)) if channel_id else interaction.channel
+        
+        if not canal:
+            await interaction.followup.send("❌ No se encontró un canal válido para enviar los mensajes.", ephemeral=True)
+            return
+
+        notifier = interaction.client.notifier_service
+        embeds = [notifier._build_game_embed(game) for game in active_games]
+        
+        # Enviar respetando el límite de la API de Discord
+        try:
+            for i in range(0, len(embeds), 10):
+                await canal.send(
+                    content="🔧 **[Prueba de Envío Forzado]**" if i == 0 else "", 
+                    embeds=embeds[i:i+10]
+                )
+            await interaction.followup.send(f"✅ Se han enviado {len(active_games)} juegos al canal {canal.mention}.", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Error al enviar los mensajes al canal: {e}", ephemeral=True)
+
+    @app_commands.command(name="simular_dm", description="🤖 [Admin] Simula que un juego al que estás suscrito acaba de salir gratis.")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
+    async def simular_dm(self, interaction: discord.Interaction):
+        """Busca una suscripción activa del usuario y dispara el flujo de MD de forma simulada."""
+        await interaction.response.defer(ephemeral=True)
+        
+        user_id = str(interaction.user.id)
+        
+        # 1. Buscar a qué juego está suscrito el usuario que ejecuta el comando
+        conn = db_manager.get_db_connection()
+        row = conn.execute('''
+            SELECT g.* FROM games g 
+            JOIN subscriptions s ON g.id = s.game_id 
+            WHERE s.user_id = ? 
+            LIMIT 1
+        ''', (user_id,)).fetchone()
+        conn.close()
+        
+        if not row:
+            await interaction.followup.send(
+                "❌ No estás suscrito a ningún juego. Usa `/proximos` primero para suscribirte a uno y vuelve a intentarlo.", 
+                ephemeral=True
+            )
+            return
+            
+        # 2. Convertir la fila en un diccionario y forzar su estado para engañar al sistema
+        juego_simulado = dict(row)
+        juego_simulado["status"] = "current"
+        
+        # Por si el scraper no extrajo bien el promo_type en el upcoming, forzamos 'Keep' para que el Embed quede bonito
+        if not juego_simulado.get("promo_type"):
+            juego_simulado["promo_type"] = "Keep" 
+
+        # 3. Llamar directamente a la función real del Notifier que procesa y envía los MDs
+        try:
+            notifier = interaction.client.notifier_service
+            
+            # Esto enviará el MD a todos los suscritos (incluyéndote a ti) y borrará la suscripción de la base de datos
+            await notifier._process_user_subscriptions(juego_simulado)
+            
+            await interaction.followup.send(
+                f"✅ **¡Simulación completada!**\nEl sistema cree que **{juego_simulado['title']}** ya es gratis.\nRevisa tus Mensajes Directos de Discord. (Nota: tu suscripción a este juego ha sido consumida y borrada, exactamente como ocurriría en producción).", 
+                ephemeral=True
+            )
+        except Exception as e:
+            await interaction.followup.send(f"❌ Error crítico al intentar enviar el MD: {e}", ephemeral=True)
 
 
 # Función obligatoria para que discord.py cargue el Cog correctamente
