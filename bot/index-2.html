@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemon Tracker - Rastreador de Juegos Gratuitos para Discord</title>
+    <!-- FontAwesome para iconos de alta calidad -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts con pesos optimizados -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-dark-base: #080b11;
+            --bg-dark-card: #0f1524;
+            --bg-discord-dark: #313338;
+            --bg-discord-embed: #1e1f22;
+            --color-lemon: #eab308;
+            --color-lemon-glow: rgba(234, 179, 8, 0.15);
+            --color-discord-blurple: #5865F2;
+            --color-discord-hover: #4752C4;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-discord-muted: #949ba4;
+            --border-glow: rgba(234, 179, 8, 0.08);
+            --transition-smooth: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark-base);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* --- CONTENEDOR --- */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* --- NAVEGACIÓN --- */
+        nav {
+            padding: 24px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            position: relative;
+            z-index: 10;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: var(--transition-smooth);
+        }
+
+        .logo i {
+            color: var(--color-lemon);
+            filter: drop-shadow(0 0 8px var(--color-lemon-glow));
+        }
+
+        .logo span {
+            color: var(--color-lemon);
+        }
+
+        .btn-invite {
+            background-color: var(--color-discord-blurple);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 20px rgba(88, 101, 242, 0.2);
+            transition: var(--transition-smooth);
+        }
+
+        .btn-invite:hover {
+            background-color: var(--color-discord-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(88, 101, 242, 0.35);
+        }
+
+        /* --- HERO --- */
+        .hero {
+            padding: 100px 0 80px 0;
+            display: flex;
+            align-items: center;
+            gap: 60px;
+            position: relative;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -10%;
+            right: -10%;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(234, 179, 8, 0.05) 0%, rgba(0,0,0,0) 70%);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .hero-content {
+            flex: 1.2;
+            position: relative;
+            z-index: 2;
+        }
+
+        .tagline {
+            background: rgba(234, 179, 8, 0.08);
+            border: 1px solid rgba(234, 179, 8, 0.2);
+            color: var(--color-lemon);
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 24px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .hero-content h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3.8rem;
+            font-weight: 700;
+            line-height: 1.15;
+            margin-bottom: 24px;
+            letter-spacing: -0.02em;
+        }
+
+        .hero-content h1 span {
+            color: var(--color-lemon);
+            position: relative;
+            display: inline-block;
+        }
+
+        .hero-content p {
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            margin-bottom: 40px;
+            max-width: 580px;
+            line-height: 1.7;
+        }
+
+        .hero-visual {
+            flex: 0.8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-visual img {
+            max-width: 340px;
+            width: 100%;
+            height: auto;
+            border-radius: 40px;
+            filter: drop-shadow(0 15px 50px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 30px rgba(234, 179, 8, 0.1));
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-12px) rotate(1deg); }
+        }
+
+        /* --- PLATAFORMAS --- */
+        .platforms {
+            padding: 80px 0;
+            background: linear-gradient(180deg, var(--bg-dark-base) 0%, #0c101a 100%);
+            border-top: 1px solid rgba(255, 255, 255, 0.02);
+            position: relative;
+        }
+
+        .platforms-title {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .platforms-title h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .platforms-title p {
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+        }
+
+        .platform-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .platform-card {
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-glow);
+            padding: 40px 30px;
+            border-radius: 20px;
+            text-align: center;
+            transition: var(--transition-smooth);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .platform-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--color-lemon), transparent);
+            opacity: 0;
+            transition: var(--transition-smooth);
+        }
+
+        .platform-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(234, 179, 8, 0.25);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(234, 179, 8, 0.05);
+        }
+
+        .platform-card:hover::before {
+            opacity: 1;
+        }
+
+        .platform-card i {
+            font-size: 3rem;
+            color: var(--color-lemon);
+            margin-bottom: 24px;
+            display: inline-block;
+            transition: var(--transition-smooth);
+        }
+
+        .platform-card:hover i {
+            transform: scale(1.1);
+        }
+
+        .platform-card h3 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .platform-card p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        /* --- CARACTERÍSTICAS --- */
+        .features {
+            padding: 100px 0;
+            position: relative;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .section-header h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.6rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .section-header h2 span {
+            color: var(--color-lemon);
+        }
+
+        .section-header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+
+        .feature-card {
+            background: var(--bg-dark-card);
+            border: 1px solid rgba(255, 255, 255, 0.02);
+            padding: 40px;
+            border-radius: 24px;
+            display: flex;
+            gap: 24px;
+            align-items: flex-start;
+            transition: var(--transition-smooth);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(255, 255, 255, 0.05);
+            background: #111827;
+        }
+
+        .feature-icon-wrapper {
+            background: rgba(234, 179, 8, 0.06);
+            border: 1px solid rgba(234, 179, 8, 0.15);
+            color: var(--color-lemon);
+            padding: 18px;
+            border-radius: 16px;
+            font-size: 1.6rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .feature-info h3 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .feature-info h3 span {
+            font-size: 0.75rem;
+            background: rgba(234, 179, 8, 0.1);
+            color: var(--color-lemon);
+            padding: 2px 8px;
+            border-radius: 6px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .feature-info p {
+            color: var(--text-secondary);
+            font-size: 0.98rem;
+            line-height: 1.6;
+        }
+
+        /* --- VISTA PREVIA INTERACTIVA 3D --- */
+        .preview-section {
+            padding: 100px 0;
+            background: radial-gradient(circle at center, #0e1321 0%, var(--bg-dark-base) 100%);
+            overflow: hidden;
+        }
+
+        .preview-layout {
+            display: flex;
+            align-items: center;
+            gap: 60px;
+        }
+
+        .preview-text {
+            flex: 1;
+        }
+
+        .preview-text h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.6rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .preview-text h2 span {
+            color: var(--color-lemon);
+        }
+
+        .preview-text p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+        }
+
+        .preview-visual-container {
+            flex: 1.2;
+            perspective: 1200px; /* Activa el entorno de renderizado 3D */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Simulación de la interfaz de chat de Discord en perspectiva */
+        .discord-mockup-wrapper {
+            width: 100%;
+            max-width: 580px;
+            transform: rotateY(-12deg) rotateX(8deg) rotateZ(-1deg);
+            transform-style: preserve-3d;
+            box-shadow: -20px 20px 50px rgba(0, 0, 0, 0.6), 0 10px 30px rgba(0,0,0,0.5);
+            border-radius: 16px;
+            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .discord-mockup-wrapper:hover {
+            transform: rotateY(-3deg) rotateX(3deg) rotateZ(0deg) scale(1.02);
+        }
+
+        .discord-mockup {
+            background-color: var(--bg-discord-dark);
+            border-radius: 15px;
+            overflow: hidden;
+            padding: 24px;
+        }
+
+        .discord-message {
+            display: flex;
+            gap: 16px;
+        }
+
+        .discord-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            overflow: hidden;
+            flex-shrink: 0;
+            background: var(--bg-dark-card);
+            border: 2px solid var(--color-lemon);
+            box-shadow: 0 0 10px rgba(234, 179, 8, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .discord-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .discord-content {
+            flex-grow: 1;
+        }
+
+        .discord-user-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .discord-username {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .discord-bot-tag {
+            background-color: var(--color-discord-blurple);
+            color: #ffffff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .discord-timestamp {
+            color: var(--text-discord-muted);
+            font-size: 0.75rem;
+        }
+
+        /* --- DISCORD EMBED (RÉPLICA EXACTA) --- */
+        .discord-embed {
+            background-color: var(--bg-discord-embed);
+            border-left: 4px solid #2ecc71; /* Color de tu clase notifier.py para Keep */
+            border-radius: 4px;
+            padding: 16px 16px 20px 16px;
+            max-width: 520px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+
+        .embed-title-link {
+            color: #00b0f4;
+            font-size: 1.1rem;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-block;
+            margin-bottom: 8px;
+            transition: var(--transition-smooth);
+        }
+
+        .embed-title-link:hover {
+            text-decoration: underline;
+        }
+
+        .embed-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-primary);
+            font-weight: 700;
+            font-size: 0.95rem;
+            margin-bottom: 12px;
+        }
+
+        .embed-badge-dot {
+            width: 12px;
+            height: 12px;
+            background-color: #2ecc71;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .embed-description {
+            color: var(--text-primary);
+            font-size: 0.92rem;
+            margin-bottom: 14px;
+            line-height: 1.5;
+        }
+
+        .embed-store-link {
+            color: #00b0f4;
+            font-size: 0.92rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+
+        .embed-store-link:hover {
+            text-decoration: underline;
+        }
+
+        .embed-fields {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .embed-field-col {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .embed-field-label {
+            color: var(--text-discord-muted);
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 4px;
+        }
+
+        .embed-field-value {
+            color: #dcddde;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .embed-image-wrapper {
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .embed-image-wrapper img {
+            width: 100%;
+            display: block;
+            height: auto;
+        }
+
+        .embed-footer {
+            color: #dcddde;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        /* --- FINAL CTA --- */
+        .cta-final {
+            padding: 120px 0;
+            text-align: center;
+            background: linear-gradient(180deg, var(--bg-dark-base) 0%, rgba(88, 101, 242, 0.08) 100%);
+            position: relative;
+        }
+
+        .cta-final::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(234, 179, 8, 0.2), transparent);
+        }
+
+        .cta-final h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .cta-final p {
+            color: var(--text-secondary);
+            font-size: 1.25rem;
+            max-width: 600px;
+            margin: 0 auto 40px auto;
+        }
+
+        .cta-final .btn-invite {
+            display: inline-flex;
+            padding: 16px 36px;
+            font-size: 1.1rem;
+        }
+
+        /* --- FOOTER --- */
+        footer {
+            padding: 40px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.02);
+            text-align: center;
+            color: var(--text-discord-muted);
+            font-size: 0.9rem;
+        }
+
+        /* --- RESPONSIVE MODERNO --- */
+        @media (max-width: 1024px) {
+            .hero-content h1 {
+                font-size: 3.2rem;
+            }
+            .platform-grid {
+                gap: 16px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .hero {
+                flex-direction: column-reverse;
+                text-align: center;
+                padding: 60px 0 40px 0;
+                gap: 40px;
+            }
+            .hero-content h1 {
+                font-size: 2.6rem;
+            }
+            .hero-content p {
+                margin-left: auto;
+                margin-right: auto;
+                font-size: 1.1rem;
+            }
+            .platform-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            /* Solución al padding descentrado y compresión de elementos en móvil */
+            .feature-card {
+                padding: 32px 24px;
+                gap: 20px;
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+            .feature-info h3 {
+                justify-content: center;
+                text-align: center;
+            }
+            .preview-layout {
+                flex-direction: column;
+                gap: 40px;
+            }
+            .preview-visual-container {
+                width: 100%;
+            }
+            .discord-mockup-wrapper {
+                transform: none !important; /* Desactiva la perspectiva 3D en tablets/móviles para evitar recortes */
+            }
+            .discord-mockup-wrapper:hover {
+                transform: scale(1.02) !important;
+            }
+        }
+
+        @media (max-width: 540px) {
+            /* Solución al botón del navbar en móvil para evitar que se comprima o colapse toscamente */
+            .nav-btn-invite .btn-text {
+                display: none;
+            }
+            .nav-btn-invite {
+                padding: 0;
+                width: 44px;
+                height: 44px;
+                border-radius: 50%;
+                justify-content: center;
+            }
+            .nav-btn-invite i {
+                margin: 0;
+                font-size: 1.25rem;
+            }
+            .logo {
+                font-size: 1.4rem;
+            }
+            .hero-content h1 {
+                font-size: 2.2rem;
+            }
+            .hero-visual img {
+                max-width: 280px;
+            }
+            .cta-final h2 {
+                font-size: 2.2rem;
+            }
+            .preview-text h2 {
+                font-size: 2.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- MENÚ DE NAVEGACIÓN -->
+    <div class="container">
+        <nav>
+            <a href="#" class="logo">
+                <i class="fa-solid fa-lemon"></i> Lemon<span>Tracker</span>
+            </a>
+            <!-- Clase nav-btn-invite para un colapso limpio en móvil -->
+            <a href="https://discord.com" target="_blank" class="btn-invite nav-btn-invite">
+                <i class="fa-brands fa-discord"></i> <span class="btn-text">Añadir a Discord</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- SECCIÓN DE BIENVENIDA (HERO) -->
+    <div class="container">
+        <section class="hero">
+            <div class="hero-content">
+                <span class="tagline"><i class="fa-solid fa-bolt"></i> Actualizaciones en Tiempo Real</span>
+                <h1>Consigue cada <span>juego gratuito</span> al instante</h1>
+                <p>Lemon Tracker monitorea silenciosamente las mejores plataformas de distribución y envía alertas directas cuando un juego pasa a costar 0€. Maximiza tu biblioteca sin vaciar tu cartera.</p>
+                <a href="https://discord.com" target="_blank" class="btn-invite" style="display: inline-flex; padding: 14px 32px;">
+                    <i class="fa-brands fa-discord"></i> Vincular a mi Servidor
+                </a>
+            </div>
+            <div class="hero-visual">
+                <img src="LemonTracker.png" alt="Lemon Tracker Logo Mascot" onerror="this.src='https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=400&q=80'">
+            </div>
+        </section>
+    </div>
+
+    <!-- SECCIÓN DE PLATAFORMAS RASTREADAS -->
+    <section class="platforms">
+        <div class="container">
+            <div class="platforms-title">
+                <h2>Rastreo de Múltiples Plataformas</h2>
+                <p>Lemon Tracker indexa continuamente las tiendas de PC líderes del mercado.</p>
+            </div>
+            <div class="platform-grid">
+                <!-- Tarjeta Steam -->
+                <div class="platform-card">
+                    <i class="fa-brands fa-steam"></i>
+                    <h3>Steam</h3>
+                    <p>Escaner automatizado acoplado a SteamDB. Detecta promociones "Keep to Permanent", ofertas cruzadas y fines de semana de acceso libre.</p>
+                </div>
+                <!-- Tarjeta Epic Games -->
+                <div class="platform-card">
+                    <i class="fa-solid fa-cube"></i>
+                    <h3>Epic Games</h3>
+                    <p>Comunicación directa con la API interna de Epic Games Store para notificar los lanzamientos semanales gratuitos al segundo de su publicación.</p>
+                </div>
+                <!-- Tarjeta GOG -->
+                <div class="platform-card">
+                    <i class="fa-solid fa-gamepad"></i>
+                    <h3>GOG</h3>
+                    <p>Control exhaustivo sobre las ofertas clásicas de CD Projekt sin protección DRM, entregándote juegos completos para conservar para siempre.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECCIÓN DE CARACTERÍSTICAS -->
+    <section class="features">
+        <div class="container">
+            <div class="section-header">
+                <h2>¿Qué hace único a <span>Lemon Tracker</span>?</h2>
+                <p>Un bot programado desde el primer día para ser preciso, eficiente y limpio en tus servidores de Discord.</p>
+            </div>
+            <div class="features-grid">
+                <!-- 1. Avisos Diarios -->
+                <div class="feature-card">
+                    <div class="feature-icon-wrapper">
+                        <i class="fa-solid fa-bell"></i>
+                    </div>
+                    <div class="feature-info">
+                        <h3>Avisos Diarios de Promociones <span>Nuevo</span></h3>
+                        <p>No te pierdas absolutamente nada. El bot avisa diariamente en el instante que una promoción de juego gratuito o Free-to-Play por tiempo limitado entra en vigor.</p>
+                    </div>
+                </div>
+
+                <!-- 2. Previsiones Futuras -->
+                <div class="feature-card">
+                    <div class="feature-icon-wrapper">
+                        <i class="fa-solid fa-calendar-days"></i>
+                    </div>
+                    <div class="feature-info">
+                        <h3>Listado de Posibles Juegos Gratuitos</h3>
+                        <p>Accede a un boletín de previsiones con las fechas estimadas por la comunidad sobre los próximos juegos que pasarán a ser gratuitos, permitiéndote planificar tus suscripciones.</p>
+                    </div>
+                </div>
+
+                <!-- 3. Avisos de suscripción -->
+                <div class="feature-card">
+                    <div class="feature-icon-wrapper">
+                        <i class="fa-solid fa-user-check"></i>
+                    </div>
+                    <div class="feature-info">
+                        <h3>Alertas de tus Suscripciones por DM</h3>
+                        <p>¿Interesado en un lanzamiento futuro? Suscríbete usando nuestro selector interactivo en Discord. Lemon Tracker se encargará de enviarte un mensaje directo (DM) automatizado apenas el juego esté listo.</p>
+                    </div>
+                </div>
+
+                <!-- 4. Filtro Anti-Spam de 14 días -->
+                <div class="feature-card">
+                    <div class="feature-icon-wrapper">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <div class="feature-info">
+                        <h3>Filtro Inteligente de 14 Días</h3>
+                        <p>Evitamos el molesto spam en tus canales. Si una promoción recurrente vuelve a aparecer en menos de 14 días, el bot actualizará la base de datos de manera silenciosa sin alertar repetidamente.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- VISTA PREVIA INTERACTIVA 3D -->
+    <section class="preview-section">
+        <div class="container">
+            <div class="preview-layout">
+                <div class="preview-text">
+                    <h2>Diseño Integrado <span>Premium</span></h2>
+                    <p>Los embeds de Lemon Tracker se adaptan orgánicamente a la interfaz oscura de Discord, presentando la información en tablas organizadas que reducen la sobrecarga visual e incluyen links de redirección directa a la plataforma de reclamado.</p>
+                    <div style="display: flex; gap: 16px;">
+                        <span style="display: flex; align-items: center; gap: 8px; font-size: 0.95rem; color: var(--text-secondary);">
+                            <i class="fa-solid fa-circle-check" style="color: var(--color-lemon);"></i> Adaptativo
+                        </span>
+                        <span style="display: flex; align-items: center; gap: 8px; font-size: 0.95rem; color: var(--text-secondary);">
+                            <i class="fa-solid fa-circle-check" style="color: var(--color-lemon);"></i> Botones Directos
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="preview-visual-container">
+                    <!-- Contenedor 3D Rotado que emula a Discord -->
+                    <div class="discord-mockup-wrapper">
+                        <div class="discord-mockup">
+                            <div class="discord-message">
+                                <!-- Avatar Mocked -->
+                                <div class="discord-avatar">
+                                    <img src="LemonTracker.png" alt="Lemon Tracker Avatar" onerror="this.src='https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=100&q=80'">
+                                </div>
+                                <div class="discord-content">
+                                    <div class="discord-user-header">
+                                        <span class="discord-username">Lemon Tracker</span>
+                                        <span class="discord-bot-tag">✓ Bot</span>
+                                        <span class="discord-timestamp">Hoy a las 15:00 UTC</span>
+                                    </div>
+                                    
+                                    <!-- Embed de Tomb Raider de la captura del usuario -->
+                                    <div class="discord-embed">
+                                        <a href="https://store.epicgames.com" target="_blank" class="embed-title-link">Tomb Raider I-III Remastered Starring Lara Croft</a>
+                                        
+                                        <div class="embed-badge">
+                                            <span class="embed-badge-dot"></span>
+                                            Free to keep
+                                        </div>
+
+                                        <div class="embed-description">
+                                            ¡Consigue este juego gratis ahora y <strong>pásatelo a tu biblioteca permanente</strong>! Será tuyo para siempre sin coste alguno.
+                                        </div>
+
+                                        <a href="https://store.epicgames.com" target="_blank" class="embed-store-link">
+                                            <i class="fa-solid fa-link"></i> Ver oferta directamente en la tienda
+                                        </a>
+
+                                        <div class="embed-fields">
+                                            <div class="embed-field-col">
+                                                <span class="embed-field-label">Tipo de Promoción</span>
+                                                <span class="embed-field-value">🆓 Conservarlo para siempre</span>
+                                            </div>
+                                            <div class="embed-field-col">
+                                                <span class="embed-field-label">Plataforma</span>
+                                                <span class="embed-field-value">Epic</span>
+                                            </div>
+                                            <div class="embed-field-col" style="grid-column: span 2;">
+                                                <span class="embed-field-label">Finaliza el</span>
+                                                <span class="embed-field-value">📅 28/05/2026 15:00 UTC</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="embed-image-wrapper">
+                                            <!-- Imagen representativa de Tomb Raider Remastered -->
+                                            <img src="https://images.unsplash.com/photo-1612287230202-1bf1d85d1bdf?auto=format&fit=crop&w=600&q=80" alt="Tomb Raider Remastered Art" onerror="this.style.display='none'">
+                                        </div>
+
+                                        <div class="embed-footer">
+                                            Game Notifier Bot • Alertas automáticas
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECCIÓN FINAL CTA -->
+    <section class="cta-final">
+        <div class="container">
+            <h2>Lleva la experiencia a tu servidor</h2>
+            <p>Configura tu bot en menos de 2 minutos utilizando el comando `/configurar_canal` y pon al día a tu comunidad.</p>
+            <a href="https://discord.com" target="_blank" class="btn-invite">
+                <i class="fa-brands fa-discord"></i> Añadir Bot Ahora
+            </a>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 Lemon Tracker • Diseñado bajo optimización extrema para sistemas embebidos.</p>
+        </div>
+    </footer>
+
+</body>
+</html>
