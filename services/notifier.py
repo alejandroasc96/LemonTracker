@@ -12,12 +12,20 @@ class NotifierService:
         self.bot = bot
         self.scrapers = [SteamScraper(), EpicScraper(), GogScraper()]
 
-    async def run_scrapers_and_notify(self):
-        """Orquestador principal del ciclo de raspado y distribución de alertas."""
-        print("🔍 [Notifier] Iniciando ciclo de actualización de plataformas...")
+    async def scrape_and_update(self, platform_filter: str = None):
+        """
+        Ejecuta los scrapers (todos o uno específico según el filtro) y actualiza la BD.
+        Gracias al Diff-Caching, si no hay novedades reales, no se desgastará la MicroSD.
+        """
+        target = platform_filter.lower() if platform_filter else "todas"
+        print(f"🔍 [Notifier] Iniciando ciclo de raspado para plataforma: {target}...")
         
         all_scraped_games = []
         for scraper in self.scrapers:
+            # Si se pasa un filtro específico (ej. "epic"), ignoramos los demás scrapers
+            if platform_filter and platform_filter.lower() not in scraper.name.lower():
+                continue
+                
             try:
                 games = scraper.extraer()
                 all_scraped_games.extend(games)
@@ -25,27 +33,36 @@ class NotifierService:
                 print(f"❌ Error ejecutando {scraper.name}: {e}")
 
         if not all_scraped_games:
-            print("⚠️ [Notifier] No se recuperaron juegos en este ciclo.")
+            print(f"⚠️ [Notifier] No se recuperaron juegos para {target} en este ciclo.")
             return
 
+        # Para las suscripciones inmediatas por mensaje directo, necesitamos el estado previo en RAM
         conn = db_manager.get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT id, status FROM games")
         previous_states = {row["id"]: row["status"] for row in cursor.fetchall()}
         conn.close()
 
+        # Guardar en lote (aquí actúa el Diff-Caching y la optimización SQLite)
         db_manager.save_games_batch(all_scraped_games)
 
-        pending_global_games = db_manager.get_games_pending_notification()
-        # pending_global_games = [g for g in all_scraped_games if g["status"] == "current"] # Para probar el proceso automático de alertas globales sin esperar a que se cumplan las condiciones de notificación basadas en tiempo
-        if pending_global_games:
-            await self._distribute_channel_alerts(pending_global_games)
-
+        # Traspaso inmediato de 'upcoming' a 'current' para usuarios con suscripción por DM
         for game in all_scraped_games:
             if game["status"] == "current" and previous_states.get(game["id"]) == "upcoming":
                 await self._process_user_subscriptions(game)
 
-        print("✅ [Notifier] Ciclo de notificaciones completado con éxito.")
+        print(f"✅ [Notifier] Raspado de {target} completado y guardado localmente.")
+
+    async def send_pending_alerts(self):
+        """Revisa la base de datos de manera independiente y despacha las alertas globales pendientes."""
+        print("🔔 [Notifier] Comprobando cola de alertas globales pendientes en los canales...")
+        
+        pending_global_games = db_manager.get_games_pending_notification()
+        if pending_global_games:
+            await self._distribute_channel_alerts(pending_global_games)
+            print(f"✅ [Notifier] {len(pending_global_games)} alertas globales enviadas con éxito.")
+        else:
+            print("📭 [Notifier] No hay alertas globales pendientes por notificar en este bloque horaria.")
 
     async def _distribute_channel_alerts(self, games: List[Dict[str, Any]]):
         """Envía las alertas de nuevos juegos a los canales correspondientes."""
@@ -126,7 +143,7 @@ class NotifierService:
                 f"{descripcion_dinamica}\n\n"
                 f"🔗 **[Ver oferta directamente en la tienda]({game['url']})**"
             ),
-            color=embed_color  # El color de la tarjeta ahora representa visualmente la urgencia/tipo de oferta
+            color=embed_color  # El color de la tarjeta representa visualmente el tipo de oferta
         )
         
         if game["platform"] in platform_icons:
@@ -171,14 +188,13 @@ class NotifierService:
         if not steam_upcoming:
             embed.description += "\n📭 No hay previsiones de Steam detectadas en este ciclo.\n"
         else:
-            # Construimos la lista usando encabezados grandes (###) en una sola línea
             for game in steam_upcoming:
                 fecha_est = game.get("estimated_date") or "Por confirmar"
                 embed.description += f"### 🎮 {game['title']} - {fecha_est}\n"
                 
         embed.description += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                 
-        # Bloque limpio de llamada a la acción en la parte inferior
+        # Bloque de llamada a la acción en la parte inferior
         embed.add_field(
             name="🔔 ¿Quieres que el bot te avise automáticamente?",
             value="Si quieres que te envíe un **Mensaje Directo (DM)** en cuanto cualquiera de estos títulos pase a estar disponible, simplemente usa el comando **`/proximos`** y selecciónalo en el menú desplegable.",
@@ -219,7 +235,7 @@ class NotifierService:
                 debe_enviar = True
             else:
                 last_report = datetime.fromisoformat(last_report_str)
-                # Margen de seguridad de 13 días para evitar problemas si el reloj varía por unos minutos
+                # Margen de seguridad de 13 días para evitar variaciones de minutos del reloj
                 if (now - last_report).days >= 13:
                     debe_enviar = True
 
